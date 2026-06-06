@@ -18,12 +18,19 @@ def get_time_bucket(scheduled_at: datetime) -> str:
 
 
 def find_due_jobs(current_time: datetime, db: Session) -> list[Job]:
-    """Watcher calls every minute: find due jobs in current time bucket."""
+    """Watcher calls every interval: find all due, pending jobs.
+
+    The hour bucket (``YYYYMMDDHH``) is fixed-width and chronologically
+    sortable, so ``time_bucket <= current bucket`` prunes the scan to the
+    current and all *earlier* partitions — catching jobs left over from a
+    past hour (process was offline, scheduled in the past, or an
+    hour-boundary race) instead of only the current hour.
+    """
     bucket = get_time_bucket(current_time)
     return (
         db.query(Job)
         .filter(
-            Job.time_bucket == bucket,
+            Job.time_bucket <= bucket,
             Job.scheduled_at <= current_time,
             Job.status == "pending",
         )
