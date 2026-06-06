@@ -2,6 +2,9 @@
 
 A real MCP (Model Context Protocol) server that lets Claude — or any MCP client — schedule and manage tasks via standardized tool calls.
 
+> Restructured from the reference prototype at
+> [bohr109/build-moat-live-sessions — `chatgpt_task/answers`](https://github.com/bohr109/build-moat-live-sessions/tree/main/chatgpt_task/answers).
+
 ## Key Design Decisions
 
 1. **Watcher + Queue + Worker** — Decoupled architecture: watcher scans DB for due jobs, pushes to queue, workers execute independently (in-memory queue simulates SQS)
