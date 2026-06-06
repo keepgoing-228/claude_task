@@ -1,4 +1,4 @@
-# ChatGPT Task Scheduler Prototype
+# Claude Task Scheduler Prototype
 
 A real MCP (Model Context Protocol) server that lets Claude — or any MCP client — schedule and manage tasks via standardized tool calls.
 
@@ -27,14 +27,6 @@ Dependencies are declared in `pyproject.toml`. With [uv](https://docs.astral.sh/
 
 ```bash
 uv sync
-```
-
-Or with plain pip in a virtual environment:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
 ```
 
 Run the server directly:
