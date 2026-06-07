@@ -54,27 +54,67 @@ def watcher_loop(interval: int = 10):
         time.sleep(interval)
 
 
+def _default_executor(job: Job) -> str:
+    """Run the job's work and return its result.
+
+    Simulated for the prototype — in production this would call the LLM.
+    Injectable so the execution step can be swapped or made to fail in tests.
+    """
+    return f"Executed: {job.description}"
+
+
+def _safe_mark_failed(db: Session, job_id: int, exc: Exception) -> None:
+    """Record a failure on its own clean transaction. Swallows further errors.
+
+    Re-queries by id (rather than reusing a possibly-expired instance) after a
+    rollback, and never raises — if the DB is unusable there is nothing more we
+    can record, but the worker must still survive.
+    """
+    try:
+        db.rollback()
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if job is not None:
+            job.status = "failed"
+            job.result = str(exc)
+            db.commit()
+    except Exception:
+        pass
+
+
+def process_job(job_id: int, db: Session, execute=_default_executor) -> None:
+    """Execute a single job through its lifecycle. Never raises.
+
+    pending -> running -> completed, or -> failed on any error. Self-contained
+    error handling means one bad job can never escape and kill the worker
+    thread (Bug 2: the old inline handler referenced an unbound `job` when the
+    lookup failed and took the whole worker down).
+    """
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if job is None or job.status == "cancelled":
+            return
+
+        job.status = "running"
+        db.commit()
+
+        job.result = execute(job)
+        job.status = "completed"
+        db.commit()
+    except Exception as exc:
+        _safe_mark_failed(db, job_id, exc)
+
+
 def worker_loop():
-    """Worker pulls jobs from queue and executes them."""
+    """Worker pulls job ids off the queue and processes them, forever.
+
+    process_job owns all per-job error handling and never raises, so the loop
+    stays alive across failing jobs.
+    """
     while True:
         job_id = job_queue.get()
         db = SessionLocal()
         try:
-            job = db.query(Job).filter(Job.id == job_id).first()
-            if job is None or job.status == "cancelled":
-                continue
-
-            job.status = "running"
-            db.commit()
-
-            # Simulate execution — in production this would call LLM
-            job.result = f"Executed: {job.description}"
-            job.status = "completed"
-            db.commit()
-        except Exception as e:
-            job.status = "failed"
-            job.result = str(e)
-            db.commit()
+            process_job(job_id, db)
         finally:
             db.close()
             job_queue.task_done()
