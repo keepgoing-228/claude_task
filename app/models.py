@@ -6,9 +6,19 @@ from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
 
+def to_utc_naive(dt: datetime) -> datetime:
+    """Canonical internal time: naive UTC.
+
+    Aware input is converted to UTC; naive input is assumed to already be UTC.
+    """
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(UTC)
+    return dt.replace(tzinfo=None)
+
+
 def _utcnow() -> datetime:
     """Naive UTC datetime — replacement for deprecated datetime.utcnow()."""
-    return datetime.now(UTC).replace(tzinfo=None)
+    return to_utc_naive(datetime.now(UTC))
 
 
 class Job(Base):

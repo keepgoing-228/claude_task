@@ -21,6 +21,8 @@ A real MCP (Model Context Protocol) server that lets Claude — or any MCP clien
 | `task.status` | Get the status of a scheduled task |
 | `task.cancel` | Cancel a scheduled task |
 
+**Time zones:** `scheduled_at` is ISO 8601. A timezone offset is honored and converted to UTC (e.g. `2026-05-03T10:00:00+08:00` → `02:00:00Z`); a naive timestamp with no offset is interpreted as UTC. Times are stored and compared in UTC.
+
 ## Setup
 
 Dependencies are declared in `pyproject.toml`. With [uv](https://docs.astral.sh/uv/):

@@ -17,7 +17,7 @@ from mcp.types import TextContent, Tool
 from sqlalchemy.orm import Session
 
 from .database import Base, SessionLocal, engine
-from .models import Job
+from .models import Job, to_utc_naive
 from .scheduler import get_time_bucket, start_scheduler
 
 
@@ -27,8 +27,14 @@ from .scheduler import get_time_bucket, start_scheduler
 
 
 def handle_create_task(db: Session, *, description: str, scheduled_at: str) -> dict:
-    """Create a new scheduled job."""
-    dt = datetime.fromisoformat(scheduled_at)
+    """Create a new scheduled job.
+
+    `scheduled_at` is normalized to naive UTC: an offset is converted to UTC,
+    and a naive timestamp is assumed to already be UTC. Both the stored time
+    and its hour bucket are derived from the normalized value so the watcher
+    (which scans in UTC) matches it.
+    """
+    dt = to_utc_naive(datetime.fromisoformat(scheduled_at))
     job = Job(
         description=description,
         scheduled_at=dt,
@@ -100,7 +106,12 @@ TOOL_DEFINITIONS: list[Tool] = [
                 "scheduled_at": {
                     "type": "string",
                     "format": "date-time",
-                    "description": "When to run, ISO 8601 format (e.g. 2026-05-03T10:00:00)",
+                    "description": (
+                        "When to run, ISO 8601. A timezone offset is honored and "
+                        "converted to UTC; a naive timestamp (no offset) is "
+                        "interpreted as UTC. E.g. 2026-05-03T02:00:00 or "
+                        "2026-05-03T10:00:00+08:00"
+                    ),
                 },
             },
             "required": ["description", "scheduled_at"],
